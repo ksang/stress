@@ -1,5 +1,7 @@
 package archer
 
+import "os"
+
 // Config is the config settings for Target
 type Config struct {
 	// target string
@@ -16,4 +18,6 @@ type Config struct {
 	PrintError bool
 	// total number, 0 means non-stop
 	Num uint64
+	// sighup signal channel
+	Sighup chan os.Signal
 }

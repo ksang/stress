@@ -6,6 +6,7 @@ package target
 import (
 	"log"
 	"net"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -19,9 +20,10 @@ type httpStats struct {
 
 // HttpTarget is the http server target for network performance test
 // it records stats when serving http requests
-type HttpTarget struct {
-	stats httpStats
-	ln    *StatsListener
+type httpTarget struct {
+	stats  httpStats
+	ln     *StatsListener
+	sighup chan os.Signal
 }
 
 // StatsListener records listener related stats including connection number
@@ -61,7 +63,7 @@ func (c *statsListenConn) Close() error {
 }
 
 // HandleFastHTTP is request handler for http target, records stats for performance testing.
-func (h *HttpTarget) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
+func (h *httpTarget) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 	size := h.RequestSize(ctx)
 	atomic.AddUint64(&h.stats.receivedBytes, size)
 	atomic.AddUint64(&h.stats.requestCount, 1)
@@ -69,7 +71,7 @@ func (h *HttpTarget) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 }
 
 // RequestSize calculated the size of this http request.
-func (h *HttpTarget) RequestSize(ctx *fasthttp.RequestCtx) uint64 {
+func (h *httpTarget) RequestSize(ctx *fasthttp.RequestCtx) uint64 {
 	var ret uint64
 	head := ctx.Request.Header
 	head.VisitAll(func(k, v []byte) {
@@ -81,17 +83,17 @@ func (h *HttpTarget) RequestSize(ctx *fasthttp.RequestCtx) uint64 {
 }
 
 // ConnNumber returns the current connection number of http target
-func (h *HttpTarget) ConnNumber() uint64 {
+func (h *httpTarget) ConnNumber() uint64 {
 	return atomic.LoadUint64(&h.ln.ConnNumber)
 }
 
 // ReceivedBytes returns the total bytes received of http target
-func (h *HttpTarget) ReceivedBytes() uint64 {
+func (h *httpTarget) ReceivedBytes() uint64 {
 	return atomic.LoadUint64(&h.stats.receivedBytes)
 }
 
 // ConnNumber returns the current connection number of http target
-func (h *HttpTarget) RequestCount() uint64 {
+func (h *httpTarget) RequestCount() uint64 {
 	return atomic.LoadUint64(&h.stats.requestCount)
 }
 
@@ -100,8 +102,9 @@ func StartHTTPTarget(cfg Config) error {
 	if err != nil {
 		log.Fatal("failed to bind: ", err)
 	}
-	target := &HttpTarget{
-		ln: sLn,
+	target := &httpTarget{
+		ln:     sLn,
+		sighup: cfg.Sighup,
 	}
 	server := fasthttp.Server{
 		Handler:                       target.HandleFastHTTP,
@@ -109,24 +112,39 @@ func StartHTTPTarget(cfg Config) error {
 		Concurrency:                   65536 * 32768,
 		DisableHeaderNamesNormalizing: true,
 	}
-	if cfg.PrintLog {
-		go target.PrintStats(5 * time.Second)
-		defer target.PrintStatsOnce()
-	}
+	go target.PrintStats(cfg.PrintLog)
+
 	log.Printf("HTTP Target serving at: %s", cfg.BindAddress)
 	return server.Serve(target.ln)
 }
 
-func (h *HttpTarget) PrintStats(i time.Duration) {
-	for {
-		select {
-		case <-time.After(i):
-			h.PrintStatsOnce()
-		}
+func (h *httpTarget) PrintStats(periodic bool) {
+	c := make(chan struct{}, 1)
+	if periodic {
+		defer h.PrintStatsOnce()
+		go func() {
+			for {
+				select {
+				case <-time.After(5 * time.Second):
+					c <- struct{}{}
+				}
+			}
+		}()
 	}
+
+	go func() {
+		for {
+			select {
+			case <-c:
+				h.PrintStatsOnce()
+			case <-h.sighup:
+				h.PrintStatsOnce()
+			}
+		}
+	}()
 }
 
-func (h *HttpTarget) PrintStatsOnce() {
+func (h *httpTarget) PrintStatsOnce() {
 	log.Printf("ConnNum: %v, Received Bytes: %v, Request Count: %v",
 		h.ConnNumber(), h.ReceivedBytes(), h.RequestCount())
 }

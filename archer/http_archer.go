@@ -6,6 +6,7 @@ package archer
 import (
 	"log"
 	"net/url"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +30,7 @@ type httpArcher struct {
 	connNum  int
 	num      uint64
 	data     []byte
+	sighup   chan os.Signal
 }
 
 func (h *httpArcher) Launch() error {
@@ -115,21 +117,36 @@ func StartHTTPArcher(cfg Config) error {
 		connNum:  cfg.ConnNum,
 		data:     cfg.Data,
 		num:      cfg.Num,
+		sighup:   cfg.Sighup,
 	}
-	if cfg.PrintLog {
-		go archer.PrintStats(5 * time.Second)
-		defer archer.PrintStatsOnce()
-	}
+	go archer.PrintStats(cfg.PrintLog)
 	return archer.Launch()
 }
 
-func (h *httpArcher) PrintStats(i time.Duration) {
-	for {
-		select {
-		case <-time.After(i):
-			h.PrintStatsOnce()
-		}
+func (h *httpArcher) PrintStats(periodic bool) {
+	c := make(chan struct{}, 1)
+	if periodic {
+		defer h.PrintStatsOnce()
+		go func() {
+			for {
+				select {
+				case <-time.After(5 * time.Second):
+					c <- struct{}{}
+				}
+			}
+		}()
 	}
+
+	go func() {
+		for {
+			select {
+			case <-c:
+				h.PrintStatsOnce()
+			case <-h.sighup:
+				h.PrintStatsOnce()
+			}
+		}
+	}()
 }
 
 func (h *httpArcher) PrintStatsOnce() {

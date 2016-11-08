@@ -15,7 +15,7 @@ func RunHTTPTarget(cfg Config) (*HttpTarget, error) {
 	if err != nil {
 		return nil, err
 	}
-	target := &HttpTarget{
+	target := &httpTarget{
 		ln: sLn,
 	}
 	server := fasthttp.Server{

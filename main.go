@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 
 	"github.com/google/subcommands"
 	"golang.org/x/net/context"
@@ -53,13 +55,19 @@ func (*targetCmd) Usage() string {
 
 func (t *targetCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&t.bindaddr, "bind", "0.0.0.0:8080", "target mode: local addr to bind")
-	f.BoolVar(&t.printlog, "l", false, "print stat log to stdout")
+	f.BoolVar(&t.printlog, "l", false,
+		"print stat log to stdout periodically")
 }
 
 func (t *targetCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	// init signal
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGHUP)
+
 	cfg := target.Config{
 		t.bindaddr,
 		t.printlog,
+		sig,
 	}
 	log.Fatal(target.StartHTTPTarget(cfg))
 	return subcommands.ExitSuccess
@@ -90,7 +98,8 @@ func (a *archerCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&a.interval, "i", "100ms", "archer mode: remote target url")
 	f.StringVar(&a.data, "u", "",
 		"data to send, it will try to open file first, if failed will use the string provided.")
-	f.BoolVar(&a.printlog, "l", false, "print stat log to stdout")
+	f.BoolVar(&a.printlog, "l", false,
+		"print stat log to stdout  periodically")
 	f.BoolVar(&a.printerr, "e", false, "print client error")
 	f.BoolVar(&a.verbose, "v", false, "print log + print client error")
 	f.IntVar(&a.connnum, "c", 10, "connection number")
@@ -109,6 +118,9 @@ func (a *archerCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 		a.printlog = true
 		a.printerr = true
 	}
+	// init signal
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGHUP)
 	// get input data
 	var data []byte
 	file, err := os.Open(a.data)
@@ -132,6 +144,7 @@ CONFIG:
 		PrintLog:   a.printlog,
 		PrintError: a.printerr,
 		Num:        a.num,
+		Sighup:     sig,
 	}
 	if err := archer.StartHTTPArcher(cfg); err != nil {
 		log.Fatal(err)

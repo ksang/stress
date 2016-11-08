@@ -1,15 +1,15 @@
 # stress
-Network performance test tool based on HTTP, it is based on [fasthttp](https://github.com/valyala/fasthttp).
+Network performance test tool using HTTP, it is based on [fasthttp](https://github.com/valyala/fasthttp).
 
-# build
+### build
 
 	make
 
 Above command will create a single binary in `build` folder, the binary is used for both *Target* (server) and *Archer* (client) functionality.
 
-# usage
+### usage
 
-### archer
+##### archer
 
 	archer [-lev] [-c] <ConnNum> [-n] <Num> [-i] <duration> [-u] <data>
 	       -t <url>:
@@ -19,7 +19,7 @@ Above command will create a single binary in `build` folder, the binary is used 
 	  -e	print client error
 	  -i string
 	    	archer mode: remote target url (default "100ms")
-	  -l	print stat log to stdout
+	  -l	print stat log to stdout periodically
 	  -n uint
 	    	total number of requests to send, 0 means non-stop
 	  -t string
@@ -28,10 +28,18 @@ Above command will create a single binary in `build` folder, the binary is used 
 	    	data to send, it will try to open file first, if failed will use the string provided.
 	  -v	print log + print client error
 
-### target
+`./stress -proc 16 target -bind 0.0.0.0:8080`
+
+Above command will listen on address 0.0.0.0:8080 with 16 GOMAXPROC
+
+##### target
 
 	target [-l] [-bind] <address:port>:
 	  run stress in target mode, acting as http server.
 	  -bind string
 	    	target mode: local addr to bind (default "0.0.0.0:8080")
-	  -l	print stat log to stdout
+	  -l	print stat log to stdout periodically
+
+`./stress archer -v -u stress -t 127.0.0.1:8080`
+
+Above command will launch archer client connecting to localhost sending data read from stress binary
