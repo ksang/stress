@@ -28,9 +28,9 @@ Above command will create a single binary in `build` folder, the binary is used 
 	    	data to send, it will try to open file first, if failed will use the string provided.
 	  -v	print log + print client error
 
-`./stress -proc 16 target -bind 0.0.0.0:8080`
+`./stress archer -v -u stress -t 127.0.0.1:8080`
 
-Above command will listen on address 0.0.0.0:8080 with 16 GOMAXPROC
+Above command will launch archer client connecting to localhost sending data read from stress binary
 
 ##### target
 
@@ -40,6 +40,6 @@ Above command will listen on address 0.0.0.0:8080 with 16 GOMAXPROC
 	    	target mode: local addr to bind (default "0.0.0.0:8080")
 	  -l	print stat log to stdout periodically
 
-`./stress archer -v -u stress -t 127.0.0.1:8080`
+`./stress -proc 16 target -bind 0.0.0.0:8080`
 
-Above command will launch archer client connecting to localhost sending data read from stress binary
+Above command will listen on address 0.0.0.0:8080 with 16 GOMAXPROC
