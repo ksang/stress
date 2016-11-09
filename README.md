@@ -1,6 +1,8 @@
 # stress
 Network performance test tool using HTTP, it is based on [fasthttp](https://github.com/valyala/fasthttp).
 
+[![Build Status](https://travis-ci.org/ksang/stress.svg?branch=master)](https://travis-ci.org/ksang/stress) [![Go Report Card](https://goreportcard.com/badge/github.com/ksang/stress)](https://goreportcard.com/report/github.com/ksang/stress)
+
 ### build
 
 	make
