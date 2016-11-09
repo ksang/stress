@@ -1,5 +1,5 @@
 /*
-package archer provides the stress server for performance testing
+package target provides the stress server for performance testing
 */
 package target
 
