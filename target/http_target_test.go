@@ -10,7 +10,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func RunHTTPTarget(cfg Config) (*HttpTarget, error) {
+func RunHTTPTarget(cfg Config) (*httpTarget, error) {
 	sLn, err := StatsListen(cfg.BindAddress)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func RunHTTPTarget(cfg Config) (*HttpTarget, error) {
 		MaxRequestBodySize: 999999999,
 	}
 	if cfg.PrintLog {
-		go target.PrintStats(5 * time.Second)
+		go target.PrintStats(true)
 	}
 	go server.Serve(target.ln)
 	return target, nil
