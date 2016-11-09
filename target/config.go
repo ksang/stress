@@ -6,8 +6,8 @@ import "os"
 type Config struct {
 	// <addr>:<port> to bind target
 	BindAddress string
-	// if print log to console
+	// if print log periodically
 	PrintLog bool
-	// signal channel to handle SIGHUP
+	// signal channel for SIGHUP
 	Sighup chan os.Signal
 }

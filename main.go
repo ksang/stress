@@ -1,6 +1,6 @@
 /*
-stress is Network performance test tool using HTTP, it is based on fasthttp
-for usage please see command line help or README.md
+stress is network performance test tool using HTTP, it is based on fasthttp.
+For usage please see command line help or README.md
 */
 package main
 
