@@ -1,5 +1,5 @@
 /*
-Package target provides a server to provide stress test result.
+package archer provides the stress server for performance testing
 */
 package target
 
@@ -18,8 +18,6 @@ type httpStats struct {
 	receivedBytes uint64
 }
 
-// HttpTarget is the http server target for network performance test
-// it records stats when serving http requests
 type httpTarget struct {
 	stats  httpStats
 	ln     *StatsListener
@@ -27,13 +25,13 @@ type httpTarget struct {
 }
 
 // StatsListener records listener related stats including connection number
+// it is a wrapper of net.Listener
 type StatsListener struct {
 	net.Listener
 	ConnNumber uint64
 }
 
-// StatsListen returns StatsListener which records connection number and other
-// stats.
+// StatsListen creats StatsListener internally creates a tcp4 net.Listener
 func StatsListen(addr string) (*StatsListener, error) {
 	ln, err := net.Listen("tcp4", addr)
 	if err != nil {
@@ -42,6 +40,7 @@ func StatsListen(addr string) (*StatsListener, error) {
 	return &StatsListener{ln, 0}, nil
 }
 
+// Accept wraps origin Accept method and records connection number
 func (l *StatsListener) Accept() (net.Conn, error) {
 	c, err := l.Listener.Accept()
 	if err != nil {
@@ -56,6 +55,7 @@ type statsListenConn struct {
 	net.Conn
 }
 
+// Accept wraps origin Close method and records connection number
 func (c *statsListenConn) Close() error {
 	err := c.Conn.Close()
 	atomic.AddUint64(&c.StatsListener.ConnNumber, ^uint64(0))
@@ -70,7 +70,7 @@ func (h *httpTarget) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 	ctx.SuccessString("Text", "Stress target OK")
 }
 
-// RequestSize calculated the size of this http request.
+// RequestSize return the size of this http request.
 func (h *httpTarget) RequestSize(ctx *fasthttp.RequestCtx) uint64 {
 	var ret uint64
 	head := ctx.Request.Header
@@ -82,21 +82,19 @@ func (h *httpTarget) RequestSize(ctx *fasthttp.RequestCtx) uint64 {
 	return ret
 }
 
-// ConnNumber returns the current connection number of http target
 func (h *httpTarget) ConnNumber() uint64 {
 	return atomic.LoadUint64(&h.ln.ConnNumber)
 }
 
-// ReceivedBytes returns the total bytes received of http target
 func (h *httpTarget) ReceivedBytes() uint64 {
 	return atomic.LoadUint64(&h.stats.receivedBytes)
 }
 
-// ConnNumber returns the current connection number of http target
 func (h *httpTarget) RequestCount() uint64 {
 	return atomic.LoadUint64(&h.stats.requestCount)
 }
 
+// Start HTTP target by providing target configurations
 func StartHTTPTarget(cfg Config) error {
 	sLn, err := StatsListen(cfg.BindAddress)
 	if err != nil {

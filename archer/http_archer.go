@@ -101,6 +101,7 @@ func (h *httpArcher) Failed() uint64 {
 	return atomic.LoadUint64(&h.stats.failed)
 }
 
+// Start HTTP archer by providing archer configurations
 func StartHTTPArcher(cfg Config) error {
 	u, err := url.Parse(cfg.Target)
 	if err != nil {

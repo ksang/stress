@@ -2,7 +2,7 @@ package archer
 
 import "os"
 
-// Config is the config settings for Target
+// Config is the config settings for stress archer
 type Config struct {
 	// target string
 	Target string
@@ -18,6 +18,6 @@ type Config struct {
 	PrintError bool
 	// total number, 0 means non-stop
 	Num uint64
-	// sighup signal channel
+	// signal channel for SIGHUP
 	Sighup chan os.Signal
 }
