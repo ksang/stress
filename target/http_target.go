@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/valyala/fasthttp"
+
+	"github.com/ksang/stress/etcd/server"
 )
 
 type httpStats struct {
@@ -112,6 +114,10 @@ func StartHTTPTarget(cfg Config) error {
 	}
 	go target.PrintStats(cfg.PrintLog)
 
+	if cfg.EnableEtcd {
+		go StartEtcdServer(cfg.Etcd)
+	}
+
 	log.Printf("HTTP Target serving at: %s", cfg.BindAddress)
 	return server.Serve(target.ln)
 }
@@ -145,4 +151,22 @@ func (h *httpTarget) PrintStats(periodic bool) {
 func (h *httpTarget) PrintStatsOnce() {
 	log.Printf("ConnNum: %v, Received Bytes: %v, Request Count: %v",
 		h.ConnNumber(), h.ReceivedBytes(), h.RequestCount())
+}
+
+func StartEtcdServer(cfg server.Config) {
+	cfg.InitialClusterToken = StressClusterToken
+	etcd, err := server.StartEmbedServer(cfg)
+	if err != nil {
+		log.Printf("failed to start etcd server: %v", err)
+		return
+	}
+	defer etcd.Close()
+	select {
+	case <-etcd.Server.ReadyNotify():
+		log.Printf("etcd Server is ready")
+	case <-time.After(60 * time.Second):
+		etcd.Server.Stop() // trigger a shutdown
+		log.Printf("etcd server took too long to start")
+	}
+	log.Printf("etcd server abnormal terminate: %v", <-etcd.Err())
 }

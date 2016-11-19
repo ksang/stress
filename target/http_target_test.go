@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/valyala/fasthttp"
+
+	"github.com/ksang/stress/etcd/server"
 )
 
 func RunHTTPTarget(cfg Config) (*httpTarget, error) {
@@ -24,6 +26,9 @@ func RunHTTPTarget(cfg Config) (*httpTarget, error) {
 	}
 	if cfg.PrintLog {
 		go target.PrintStats(true)
+	}
+	if cfg.EnableEtcd {
+		go StartEtcdServer(cfg.Etcd)
 	}
 	go server.Serve(target.ln)
 	return target, nil
@@ -71,4 +76,21 @@ func TestConnection(t *testing.T) {
 	if target.ConnNumber() != 0 {
 		t.Errorf("ConnNumber incorrect, not 0, actual: %v", target.ConnNumber())
 	}
+}
+
+func TestStartEtcd(t *testing.T) {
+	etcdCfg := server.Config{
+		Name:           "stress0",
+		InitialCluster: "stress0=http://localhost:2380",
+	}
+	cfg := Config{
+		BindAddress: "0.0.0.0:8888",
+		PrintLog:    true,
+		EnableEtcd:  true,
+		Etcd:        etcdCfg,
+	}
+	if _, err := RunHTTPTarget(cfg); err != nil {
+		t.Errorf("failed to start target: %s", err)
+	}
+	time.Sleep(10 * time.Second)
 }

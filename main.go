@@ -18,7 +18,9 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/ksang/stress/archer"
+	"github.com/ksang/stress/etcd/server"
 	"github.com/ksang/stress/target"
+	"github.com/ksang/stress/util"
 )
 
 var (
@@ -47,6 +49,11 @@ func main() {
 type targetCmd struct {
 	bindaddr string
 	printlog bool
+	//etcd related configuartions
+	peerURLs       string
+	clientURLs     string
+	name           string
+	initialCluster string
 }
 
 func (*targetCmd) Name() string     { return "target" }
@@ -61,6 +68,14 @@ func (t *targetCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&t.bindaddr, "bind", "0.0.0.0:8080", "target mode: local addr to bind")
 	f.BoolVar(&t.printlog, "l", false,
 		"print stat log to stdout periodically")
+	f.StringVar(&t.name, "name", "",
+		"etcd node name, set this value to enable etcd")
+	f.StringVar(&t.peerURLs, "peer", "",
+		"etcd peer urls for advertise and listen, default is http://localhost:2380")
+	f.StringVar(&t.clientURLs, "client", "",
+		"etcd client urls for advertise and listen, default is http://localhost:2379")
+	f.StringVar(&t.initialCluster, "initial-cluster", "",
+		"etcd initial cluster string")
 }
 
 func (t *targetCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -69,10 +84,32 @@ func (t *targetCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	signal.Notify(sig, syscall.SIGHUP)
 
 	cfg := target.Config{
-		t.bindaddr,
-		t.printlog,
-		sig,
+		BindAddress: t.bindaddr,
+		PrintLog:    t.printlog,
+		Sighup:      sig,
 	}
+
+	// init etcd configs
+	etcdCfg := server.Config{}
+	if len(t.name) > 0 {
+		cfg.EnableEtcd = true
+		etcdCfg.Name = t.name
+		pu, err := util.ParseStringToUrl(t.peerURLs)
+		if err != nil {
+			log.Fatalf("Failed to parse peer url: %s", err)
+		}
+		cu, err := util.ParseStringToUrl(t.clientURLs)
+		if err != nil {
+			log.Fatalf("Failed to parse client url: %s", err)
+		}
+		etcdCfg.ListenClientURLs = cu
+		etcdCfg.AdvertiseClientURLs = cu
+		etcdCfg.ListenPeerURLs = pu
+		etcdCfg.AdvertisePeerURLs = pu
+		etcdCfg.InitialCluster = t.initialCluster
+		cfg.Etcd = etcdCfg
+	}
+
 	log.Fatal(target.StartHTTPTarget(cfg))
 	return subcommands.ExitSuccess
 }
@@ -136,7 +173,6 @@ func (a *archerCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}
 	data, err = ioutil.ReadAll(file)
 	if err != nil {
 		log.Fatalf("Failed to read file: %s", err)
-		return subcommands.ExitFailure
 	}
 
 CONFIG:
