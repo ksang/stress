@@ -7,13 +7,17 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
 	"github.com/valyala/fasthttp"
+	"golang.org/x/net/context"
 
 	"github.com/ksang/stress/etcd/server"
+	"github.com/ksang/stress/util"
 )
 
 type httpStats struct {
@@ -173,9 +177,51 @@ func (h *httpTarget) StartEtcdServer(cfg server.Config) {
 	select {
 	case <-etcd.Server.ReadyNotify():
 		log.Printf("etcd Server is ready")
+		// start updating etcd stats
+		go h.UpdateEtcdStats()
 	case <-time.After(60 * time.Second):
 		etcd.Server.Stop() // trigger a shutdown
 		log.Printf("etcd server took too long to start")
 	}
 	log.Printf("etcd server abnormal terminate: %v", <-etcd.Err())
+}
+
+func (h *httpTarget) UpdateEtcdStats() {
+	endpoints := util.ParseUrlsToStrings(h.etcd.Config().LCUrls)
+	log.Printf("etcd client got endpoints: %v", endpoints)
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   endpoints,
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		log.Printf("failed to create etcd client: %v", err)
+		return
+	}
+	defer cli.Close()
+	kv := clientv3.NewKV(cli)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	for {
+		select {
+		case <-time.After(1 * time.Second):
+			h.UpdateEtcdStatsOnce(ctx, kv)
+		}
+	}
+}
+
+func (h *httpTarget) UpdateEtcdStatsOnce(ctx context.Context, kv clientv3.KV) {
+	rb := strconv.FormatUint(h.ReceivedBytes(), 10)
+	rc := strconv.FormatUint(h.RequestCount(), 10)
+	cn := strconv.FormatUint(h.ConnNumber(), 10)
+	name := h.etcd.Config().Name
+
+	ops := []clientv3.Op{
+		clientv3.OpPut(util.ReceivedBytesKey+"/"+name, rb),
+		clientv3.OpPut(util.RequestCountKey+"/"+name, rc),
+		clientv3.OpPut(util.ConnNumberKey+"/"+name, cn)}
+
+	for _, op := range ops {
+		if _, err := kv.Do(context.TODO(), op); err != nil {
+			log.Printf("failed to update etcd RequestCount: %v", err)
+		}
+	}
 }

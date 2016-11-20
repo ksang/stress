@@ -24,6 +24,7 @@ type archerStats struct {
 type httpArcher struct {
 	stats    archerStats
 	printErr bool
+	printLog bool
 	target   string
 	host     string
 	interval time.Duration
@@ -119,8 +120,12 @@ func StartHTTPArcher(cfg Config) error {
 		data:     cfg.Data,
 		num:      cfg.Num,
 		sighup:   cfg.Sighup,
+		printLog: cfg.PrintLog,
+		printErr: cfg.PrintError,
 	}
-	go archer.PrintStats(cfg.PrintLog)
+	if archer.printLog {
+		go archer.PrintStats(cfg.PrintLog)
+	}
 	return archer.Launch()
 }
 
