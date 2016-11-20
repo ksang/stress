@@ -43,3 +43,18 @@ Above command will listen on address 0.0.0.0:8080 with 16 GOMAXPROC
 Above commands will run two stress instances with etcd clusering storing stats to etcd KV. To check stats, you can run `etcdctl` with etcd client api v3, below command is for example above:
 
 `ETCDCTL_API=3 etcdctl --endpoints http://127.0.0.1:4002,http://127.0.0.1:5002 get --prefix stress`
+
+output:
+
+	stress/ConnectionNumber/etcd0
+	10
+	stress/ConnectionNumber/etcd1
+	10
+	stress/ReceivedBytes/etcd0
+	41280
+	stress/ReceivedBytes/etcd1
+	26880
+	stress/RequestCount/etcd0
+	430
+	stress/RequestCount/etcd1
+	280
