@@ -28,7 +28,7 @@ func RunHTTPTarget(cfg Config) (*httpTarget, error) {
 		go target.PrintStats(true)
 	}
 	if cfg.EnableEtcd {
-		go StartEtcdServer(cfg.Etcd)
+		go target.StartEtcdServer(cfg.Etcd)
 	}
 	go server.Serve(target.ln)
 	return target, nil
@@ -76,6 +76,7 @@ func TestConnection(t *testing.T) {
 	if target.ConnNumber() != 0 {
 		t.Errorf("ConnNumber incorrect, not 0, actual: %v", target.ConnNumber())
 	}
+	target.Close()
 }
 
 func TestStartEtcd(t *testing.T) {
@@ -84,13 +85,15 @@ func TestStartEtcd(t *testing.T) {
 		InitialCluster: "stress0=http://localhost:2380",
 	}
 	cfg := Config{
-		BindAddress: "0.0.0.0:8888",
+		BindAddress: "0.0.0.0:8889",
 		PrintLog:    true,
 		EnableEtcd:  true,
 		Etcd:        etcdCfg,
 	}
-	if _, err := RunHTTPTarget(cfg); err != nil {
+	target, err := RunHTTPTarget(cfg)
+	if err != nil {
 		t.Errorf("failed to start target: %s", err)
 	}
 	time.Sleep(10 * time.Second)
+	target.Close()
 }

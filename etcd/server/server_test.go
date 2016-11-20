@@ -25,7 +25,14 @@ func TestStartServer(t *testing.T) {
 		t.Logf("etcd Server is ready!")
 	case <-time.After(60 * time.Second):
 		etcd.Server.Stop() // trigger a shutdown
-		t.Logf("Server took too long to start!")
+		t.Errorf("Server took too long to start!")
 	}
-	t.Fatal(<-etcd.Err())
+
+	select {
+	case err := <-etcd.Err():
+		t.Errorf("etcd server error: %s", err)
+	case <-time.After(10 * time.Second):
+		t.Logf("etcd start server ok")
+	}
+	etcd.Close()
 }

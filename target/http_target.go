@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/coreos/etcd/embed"
 	"github.com/valyala/fasthttp"
 
 	"github.com/ksang/stress/etcd/server"
@@ -24,6 +25,7 @@ type httpTarget struct {
 	stats  httpStats
 	ln     *StatsListener
 	sighup chan os.Signal
+	etcd   *embed.Etcd
 }
 
 // StatsListener records listener related stats including connection number
@@ -96,6 +98,12 @@ func (h *httpTarget) RequestCount() uint64 {
 	return atomic.LoadUint64(&h.stats.requestCount)
 }
 
+func (h *httpTarget) Close() {
+	if h.etcd != nil {
+		h.etcd.Close()
+	}
+}
+
 // Start HTTP target by providing target configurations
 func StartHTTPTarget(cfg Config) error {
 	sLn, err := StatsListen(cfg.BindAddress)
@@ -115,7 +123,7 @@ func StartHTTPTarget(cfg Config) error {
 	go target.PrintStats(cfg.PrintLog)
 
 	if cfg.EnableEtcd {
-		go StartEtcdServer(cfg.Etcd)
+		go target.StartEtcdServer(cfg.Etcd)
 	}
 
 	log.Printf("HTTP Target serving at: %s", cfg.BindAddress)
@@ -153,13 +161,14 @@ func (h *httpTarget) PrintStatsOnce() {
 		h.ConnNumber(), h.ReceivedBytes(), h.RequestCount())
 }
 
-func StartEtcdServer(cfg server.Config) {
+func (h *httpTarget) StartEtcdServer(cfg server.Config) {
 	cfg.InitialClusterToken = StressClusterToken
 	etcd, err := server.StartEmbedServer(cfg)
 	if err != nil {
 		log.Printf("failed to start etcd server: %v", err)
 		return
 	}
+	h.etcd = etcd
 	defer etcd.Close()
 	select {
 	case <-etcd.Server.ReadyNotify():
